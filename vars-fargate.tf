@@ -1,11 +1,11 @@
 variable "Container_Port" {
   type = number
-  default = 8080
+  default = 8090
 }
 
 variable "Host_Port" {
   type = number
-  default = 8080
+  default = 8090
 }
 
 variable "ECR_Image" {
