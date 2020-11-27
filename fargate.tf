@@ -57,10 +57,12 @@ resource "aws_ecs_service" "ECS_Service" {
     target_group_arn = aws_alb_target_group.ECS_TargetGroup.arn
     container_name = var.Application_Name
     container_port = var.Container_Port
+
   }
   tags = {
     Name = var.Application_Name
   }
+
  # depends_on = [aws_alb_target_group.ECS_TargetGroup]
 }
 

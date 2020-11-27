@@ -63,3 +63,5 @@ resource "aws_security_group" "ECS_LB_SG" {
     name = "${var.Application_Name}_SG"
   }
 }
+
+
