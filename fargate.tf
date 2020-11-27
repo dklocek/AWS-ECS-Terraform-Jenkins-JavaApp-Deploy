@@ -50,6 +50,7 @@ resource "aws_ecs_service" "ECS_Service" {
 
   network_configuration {
       subnets = aws_subnet.ESC_Subnet.*.id
+    security_groups = [aws_security_group.ECS_LB_SG.id]
   }
 
   load_balancer {
@@ -60,8 +61,6 @@ resource "aws_ecs_service" "ECS_Service" {
   tags = {
     Name = var.Application_Name
   }
-
-
  # depends_on = [aws_alb_target_group.ECS_TargetGroup]
 }
 

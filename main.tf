@@ -3,13 +3,17 @@ data "aws_availability_zones" "aws-az" {
 }
 
 #VPC
-
 resource "aws_vpc" "ECS_VPC" {
   cidr_block = var.VPC_CIDR
   enable_dns_hostnames = true
   tags = {
     Name = "${var.tag}VPC"
   }
+}
+
+resource "aws_main_route_table_association" "ECS_MAIN_VPC_ROUT" {
+  route_table_id = aws_route_table.Internet_Subnet_for_NAT.id
+  vpc_id = aws_vpc.ECS_VPC.id
 }
 
 #ECS_SUBNETS ---FOR EVERY AVAILABILITY ZONE---
@@ -83,4 +87,3 @@ resource "aws_route_table_association" "ECS_NAT_Associate" {
   route_table_id = aws_route_table.ECS_NAT_Route.id
   subnet_id = element(aws_subnet.ESC_Subnet.*.id, count.index )
 }
-
