@@ -8,7 +8,7 @@ resource "aws_ecs_task_definition" "ECS_Task_Definition" {
   memory = "512"
   container_definitions = <<DEF
   [{
-    "name": "Test_Application",
+    "name": "${var.Application_Name}",
     "image": "${var.ECR_Image}",
     "cpu": ${var.Definition_CPU},
     "memory": ${var.Definition_Memory},
@@ -50,9 +50,19 @@ resource "aws_ecs_service" "ECS_Service" {
 
   network_configuration {
       subnets = aws_subnet.ESC_Subnet.*.id
+    security_groups = [aws_security_group.ECS_LB_SG.id]
+  }
+
+  load_balancer {
+    target_group_arn = aws_alb_target_group.ECS_TargetGroup.arn
+    container_name = var.Application_Name
+    container_port = var.Container_Port
+
   }
   tags = {
     Name = var.Application_Name
   }
+
+ # depends_on = [aws_alb_target_group.ECS_TargetGroup]
 }
 
