@@ -1,15 +1,11 @@
 import urllib.request
 import urllib.parse
-from colorama import init
-from termcolor import colored
-
-init()
 
 
 def availability_check(host, port):
     try:
         if urllib.request.urlopen(host + ":" + port, timeout=10).getcode() == 200:
-            print(colored('!OK', 'green'), 'Connection established')
+            print('!OK --- Connection established')
     except Exception as e:
         print("An Error occurred, probably can't connect to host, details below")
         exit(e)
@@ -40,14 +36,14 @@ def response_check(host, port):
         if urllib.request.urlopen(x[0]).read().decode("utf-8") != x[1]:
             exit("Data don't match for " + x[0])
         else:
-            print(colored('!OK', 'green'), x[0])
+            print('!OK ---' + x[0])
 
     main_url = host + ':' + port + '/sort?'
     for x in request_sort_list:
         sort_request = urllib.parse.urlencode(x)
         response_got = urllib.request.urlopen(main_url + sort_request).read().decode("utf-8")
         if response_got == response_expected[0] or response_got == response_expected[1]:
-            print(colored('!OK ', 'green') + str(x[1].__getitem__(1)))
+            print('!OK ' + str(x[1].__getitem__(1)))
         else:
             exit('Data don\'t match')
             print(response_got)
