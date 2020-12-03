@@ -1,16 +1,15 @@
 variable "Container_Port" {
   type = number
-  default = 8090
+  default = 80
 }
 
 variable "Host_Port" {
   type = number
-  default = 8090
+  default = 80
 }
 
 variable "ECR_Image" {
   type = string
-  default = "329794110703.dkr.ecr.eu-west-1.amazonaws.com/dklocek:latest"
 }
 
 variable "Task_Role_Arn" {
