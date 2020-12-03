@@ -16,7 +16,6 @@ pipeline {
                 steps{
                     sh "rm -rf target app.jar"
                     git branch: 'master', url: 'https://github.com/dklocek/SortAlgorithms.git'
-
                 }
         }
 
@@ -32,6 +31,7 @@ pipeline {
                 script{
                     git branch: 'dev', url: 'https://github.com/dklocek/AWS-ECS-Terraform-Jenkins-JavaApp-Deploy.git'
                     try{
+                        sh "bash cleanup.sh"
                         sh 'pkill -f app.jar'
                     }catch(Exception e){
                         echo e.toString()
@@ -46,6 +46,7 @@ pipeline {
                         sh 'nohup java -Dserver.port=$port -jar app.jar --server.port=$port &'
                         sh 'sleep 10'
                         sh 'python3.8 tests/a.py -host http://localhost -port $port'
+                        sh 'pkill -f app.jar '
                     }
                 }
             }
@@ -53,19 +54,32 @@ pipeline {
 
         stage('Build and test image'){
             steps{
-                sh """cat << EOF > Dockerfile \n from openjdk:8-jre-alpine \n COPY "app.jar" "app.jar" \n EXPOSE ${port} \n CMD [ "java", "-Dserver.port=${port}", "app.jar" ] \n"""
-                sh "docker build -t app ."
-                sh "docker run -d -p $port:$port --name app app"
-                sh 'python3.8 tests/a.py -host http://localhost -port $port'
-                sh 'docker stop app'
-                sh 'docker rm app'
+                script{
+                    sh """cat << EOF > Dockerfile \n \
+                    FROM openjdk:8-jre-alpine \n \
+                    RUN apk update \n RUN apk upgrade \n \
+                    COPY "app.jar" "app.jar" \n \
+                    EXPOSE ${port} \n \
+                    CMD ["-jar", "-Dserver.port=${port}", "app.jar" ] \n \
+                    ENTRYPOINT ["java"]"""
+                    sh "docker build -t app ."
+                    sh "docker run -d -p $port:$port --name app app"
+                    sh 'docker network create testNetwork'
+                    sh 'docker network connect testNetwork jenkins'
+                    sh 'docker network connect testNetwork app'
+                    sh 'python3.8 tests/a.py -host http://app -port $port'
+                    sh 'docker network disconnect testNetwork app'
+                    sh 'docker network disconnect testNetwork jenkins'
+                    sh 'docker network rm testNetwork'
+                    sh 'docker stop app'
+                    sh 'docker rm app'
                 }
+            }
         }
 
         stage('Push artifact to ECR'){
             steps{
                 script{
-                try{
                     withAWS(credentials: 'aws_creds', region: 'eu-west-1'){
                         sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 329794110703.dkr.ecr.eu-west-1.amazonaws.com'
                         sh 'docker tag app 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER'
@@ -73,11 +87,15 @@ pipeline {
                         sh 'docker rmi 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER'
                         sh 'docker rmi app'
                     }
-                }catch(Exception e){
-                        sh 'docker rmi app'
-                        sh 'docker rmi 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER'
-
                 }
+            }
+        }
+
+        stage('Deploy'){
+            steps{
+                withAWS(credentials: 'aws_creds', region: 'eu-wes-1'){
+                    sh 'terraform init'
+                    sh 'terraform plan -var="ECR_Image=329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER"'
                 }
             }
         }

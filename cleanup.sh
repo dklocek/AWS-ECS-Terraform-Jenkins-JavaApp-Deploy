@@ -21,3 +21,7 @@ then
 echo "$(docker rmi ${id})"
 fi
 done
+
+echo "$(docker network disconnect testNetwork app)"
+echo "$(docker network disconnect testNetwork jenkins)"
+echo "$(docker network rm testNetwork)"
