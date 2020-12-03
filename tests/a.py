@@ -14,4 +14,3 @@ for i in range(1, len(sys.argv)):
 
 availability_check(host, port)
 response_check(host, port)
-host
