@@ -68,6 +68,7 @@ pipeline {
                     sh 'docker network connect testNetwork jenkins'
                     sh 'docker network connect testNetwork app'
                     sh 'python3.8 tests/a.py -host http://app -port $port'
+                    sh 'sleep 2'
                     sh 'docker network disconnect testNetwork app'
                     sh 'docker network disconnect testNetwork jenkins'
                     sh 'docker network rm testNetwork'

@@ -6,7 +6,7 @@ images=$(docker image ls --format '{{.ID}}')
 for id in ${containers}
 do
 con_inspect=$(docker inspect --format='{{.Name}}' ${id})
-if [[ ${con_inspect}  == "<none>" ]] || [[ ${con_inspect} == "app" ]]
+if [[ ${con_inspect}  == "<none>" ]] || [[ ${con_inspect} == "/app" ]]
 then
 echo "$(docker stop ${id})"
 echo "$(docker rm ${id})"
