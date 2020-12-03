@@ -8,6 +8,7 @@ pipeline {
     parameters {
             choice(name: 'port', choices: ['60001', '60002', '60003', '60004', '60005', '60006', '60007', '60008', '60009', '60010'], description: 'Port')
             choice(name: 'action', choices: ['apply', 'destroy'])
+            string(name: 'deployPort', defaultValue: '80', description: 'Port which will be used by application on deployed environment')
     }
 
     stages{
@@ -20,6 +21,7 @@ pipeline {
         }
 
         stage('Build'){
+            when{ expression { params.action != 'destroy'}}
             steps{
                 sh 'mvn package'
                 sh 'mv target/*.jar app.jar'
@@ -27,6 +29,7 @@ pipeline {
         }
 
         stage('Prepare'){
+            when{ expression { params.action != 'destroy'}}
             steps{
                 script{
                     git branch: 'dev', url: 'https://github.com/dklocek/AWS-ECS-Terraform-Jenkins-JavaApp-Deploy.git'
@@ -40,6 +43,7 @@ pipeline {
             }
         }
         stage('Run & Local Test'){
+            when{ expression { params.action != 'destroy'}}
             steps{
                 script{
                     withEnv(['JENKINS_NODE_COOKIE=dontkill']){
@@ -53,6 +57,7 @@ pipeline {
         }
 
         stage('Build and test image'){
+            when{ expression { params.action != 'destroy'}}
             steps{
                 script{
                     sh """cat << EOF > Dockerfile \n \
@@ -60,15 +65,15 @@ pipeline {
                     RUN apk update \n RUN apk upgrade \n \
                     COPY "app.jar" "app.jar" \n \
                     EXPOSE ${port} \n \
-                    CMD ["-jar", "-Dserver.port=${port}", "app.jar" ] \n \
+                    CMD ["-jar", "-Dserver.port=${deployPort}", "app.jar" ] \n \
                     ENTRYPOINT ["java"]"""
                     sh "docker build -t app ."
-                    sh "docker run -d -p $port:$port --name app app"
+                    sh "docker run -d -p $deployPort:$deployPort --name app app"
                     sh 'docker network create testNetwork'
                     sh 'docker network connect testNetwork jenkins'
                     sh 'docker network connect testNetwork app'
-                    sh 'python3.8 tests/a.py -host http://app -port $port'
-                    sh 'sleep 2'
+                    sh 'sleep 10'
+                    sh 'python3.8 tests/a.py -host http://app -port $deployPort'
                     sh 'docker network disconnect testNetwork app'
                     sh 'docker network disconnect testNetwork jenkins'
                     sh 'docker network rm testNetwork'
@@ -79,6 +84,7 @@ pipeline {
         }
 
         stage('Push artifact to ECR'){
+            when{ expression { params.action != 'destroy'}}
             steps{
                 script{
                     withAWS(credentials: 'aws_creds', region: 'eu-west-1'){
@@ -87,18 +93,28 @@ pipeline {
                         sh 'docker push 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER'
                         sh 'docker rmi 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER'
                         sh 'docker rmi app'
+                        sh 'bash cleanup.sh'
                     }
                 }
             }
         }
 
         stage('Deploy'){
+            when{ expression { params.action != 'destroy'}}
             steps{
                 withAWS(credentials: 'aws_creds', region: 'eu-wes-1'){
                     sh 'terraform init'
-                    sh 'terraform plan -var="ECR_Image=329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER"'
+                    sh 'terraform plan -var="ECR_Image=329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$BUILD_NUMBER" -out plan'
+                    sh 'terraform apply --auto-approve plan'
                 }
             }
+        }
+
+        stage('Destroy'){
+            when{ expression { params.action == 'destroy'}}
+                steps{
+                    sh 'terraform destroy --auto-approve'
+                }
         }
     }
 }

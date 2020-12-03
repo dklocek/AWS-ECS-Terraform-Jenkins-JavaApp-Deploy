@@ -29,7 +29,7 @@ resource "aws_alb" "ECS_AppLoadBalancer" {
 
 resource "aws_alb_listener" "ECS_Listner" {
   load_balancer_arn = aws_alb.ECS_AppLoadBalancer.arn
-  port = 8090
+  port = var.Host_Port
   default_action {
     type = "forward"
     target_group_arn = aws_alb_target_group.ECS_TargetGroup.arn
