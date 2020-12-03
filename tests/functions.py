@@ -43,7 +43,7 @@ def response_check(host, port):
         sort_request = urllib.parse.urlencode(x)
         response_got = urllib.request.urlopen(main_url + sort_request).read().decode("utf-8")
         if response_got == response_expected[0] or response_got == response_expected[1]:
-            print('!OK ' + str(x[1].__getitem__(1)))
+            print('!OK '+ str(x[1].__getitem__(1)))
         else:
             exit('Data don\'t match')
             print(response_got)
