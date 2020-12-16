@@ -55,7 +55,7 @@ build_image:
   stage: build_image
   script:
     - ls -lah
-    - bash cleanup.sh
+    - bash scripts/cleanup.sh
     - echo 'FROM openjdk:8-jre-alpine' > Dockerfile
     - echo 'RUN apk update' >> Dockerfile
     - echo 'RUN apk upgrade' >> Dockerfile
@@ -90,7 +90,7 @@ push_image_to_registy:
     - docker push 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID
     - docker rmi 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID
     - docker rmi app
-    - bash cleanup.sh
+    - bash scripts/cleanup.sh
   tags:
     - root
 
