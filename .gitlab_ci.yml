@@ -41,7 +41,7 @@ test_jar:
   script:
     - setsid nohup java -Dserver.port=$PORT -jar app.jar --server.port=$PORT &
     - sleep 20
-    - python3 tests/a.py -host http://localhost -port $PORT
+    - python3 scripts/test.py -host http://localhost -port $PORT
     - pkill -f app.jar
   tags:
     - root
@@ -74,7 +74,7 @@ test_image:
   script:
     - docker run -d -p $PORT:$DEPLOY_PORT --name app app:latest
     - sleep 15
-    - python3 tests/a.py -host http://localhost -port $PORT
+    - python3 scripts/test.py -host http://localhost -port $PORT
     - docker stop app
     - docker rm app
   tags:
