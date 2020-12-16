@@ -17,3 +17,9 @@ variable "VPC_CIDR" {
   default = "10.10.0.0/16"
 }
 
+variable "ContainersCount" {
+  type = number
+  default = 3
+}
+
+
