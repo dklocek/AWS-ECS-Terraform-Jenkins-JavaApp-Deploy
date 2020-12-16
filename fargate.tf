@@ -43,7 +43,7 @@ resource "aws_ecs_service" "ECS_Service" {
   name              = "${var.Application_Name}_Service"
   task_definition   = aws_ecs_task_definition.ECS_Task_Definition.arn
 
-  desired_count     = 3
+  desired_count     = var.ContainersCount
 
   deployment_maximum_percent         = 300
   deployment_minimum_healthy_percent = 100

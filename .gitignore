@@ -2,4 +2,4 @@
 .terraform
 plan
 *.tfstate*
-/tests/__pycache__
+/scripts/__pycache__

@@ -1,0 +1,160 @@
+variables:
+  PORT: 50001
+  DEPLOY_PORT: 80
+
+cache:
+  paths:
+    - .terraform
+    - terraform.tfstate
+
+#before_script:
+#  - alias convert_report="jq -r '([.resource_changes[]?.change.actions?]|flatten)|{\"create\":(map(select(.==\"create\"))|length),\"update\":(map(select(.==\"update\"))|length),\"delete\":(map(select(.==\"delete\"))|length)}'"
+
+stages:
+  - build_jar
+  - test_jar
+  - build_image
+  - test_image
+  - push_image_to_registy
+  - deploy_dev
+  - deploy_qa
+  - deploy_preprod
+
+build_jar:
+  image: openjdk:8-alpine
+  stage: build_jar
+  script:
+    - git clone https://github.com/dklocek/SortAlgorithms.git
+    - cd SortAlgorithms
+    - mvn package
+    - mv target/*.jar ../app.jar
+  artifacts:
+    paths:
+      - app.jar
+  tags:
+    - root
+
+test_jar:
+  dependencies:
+    - build_jar
+  stage: test_jar
+  script:
+    - setsid nohup java -Dserver.port=$PORT -jar app.jar --server.port=$PORT &
+    - sleep 20
+    - python3 scripts/test.py -host http://localhost -port $PORT
+    - pkill -f app.jar
+  tags:
+    - root
+  artifacts:
+    paths:
+      - app.jar
+
+build_image:
+  dependencies:
+    - test_jar
+  stage: build_image
+  script:
+    - ls -lah
+    - bash cleanup.sh
+    - echo 'FROM openjdk:8-jre-alpine' > Dockerfile
+    - echo 'RUN apk update' >> Dockerfile
+    - echo 'RUN apk upgrade' >> Dockerfile
+    - echo 'COPY "app.jar" "app.jar"' >> Dockerfile
+    - echo "EXPOSE $DEPLOY_PORT" >> Dockerfile
+    - echo "CMD [\"-jar\", \"-Dserver.port=$DEPLOY_PORT\", \"app.jar\" ]" >> Dockerfile
+    - echo 'ENTRYPOINT ["java"]' >> Dockerfile
+    - docker build -t app:latest .
+  tags:
+    - root
+
+test_image:
+  dependencies:
+    - build_image
+  stage: test_image
+  script:
+    - docker run -d -p $PORT:$DEPLOY_PORT --name app app:latest
+    - sleep 15
+    - python3 scripts/test.py -host http://localhost -port $PORT
+    - docker stop app
+    - docker rm app
+  tags:
+    - root
+
+push_image_to_registy:
+  dependencies:
+    - test_image
+  stage: push_image_to_registy
+  script:
+    - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 329794110703.dkr.ecr.eu-west-1.amazonaws.com
+    - docker tag app 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID
+    - docker push 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID
+    - docker rmi 329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID
+    - docker rmi app
+    - bash cleanup.sh
+  tags:
+    - root
+
+deploy_dev:
+  dependencies:
+    - push_image_to_registy
+  stage: deploy_dev
+  script:
+    - terraform init
+    - terraform validate
+    - aws c3 cp s3://sorters/dev/terraform.state terraform.tfstate 2> /dev/null || echo 'no state backup found'
+    - terraform plan -out=tfplan.dev -var-file="dev.tfvars" -var="ECR_Image=329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID"
+  #        - terraform apply -input=false tfplan.dev
+  #        - aws c3 cp terraform.tfstate s3://sorters/dev/ --recursive
+  environment:
+    name: dev
+  tags:
+    - root
+  artifacts:
+    paths:
+      - tfplan.dev
+  only:
+    - dev
+
+deploy_qa:
+  stage: deploy_qa
+  script:
+    - terraform init
+    - terraform validate
+    - aws c3 cp s3://sorters/qa/terraform.state terraform.tfstate 2> /dev/null || echo 'no state backup found'
+    - terraform plan -out=tfplan.qa -var-file="qa.tfvars" -var="ECR_Image=329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID"
+  #        - terraform apply -input=false tfplan.qa
+  #        - aws c3 cp terraform.tfstate s3://sorters/qa/ --recursive
+  environment:
+    name: qa
+  tags:
+    - root
+  needs:
+    - job: deploy_dev
+  artifacts:
+    paths:
+      - tfplan.qa
+  only:
+    - qa
+
+deploy_preprod:
+  dependencies:
+    - push_image_to_registy
+  stage: deploy_preprod
+  script:
+    - terraform init
+    - terraform validate
+    - aws c3 cp s3://sorters/preprod/terraform.state terraform.tfstate 2> /dev/null || echo 'no state backup found'
+    - terraform plan -out=tfplan.preprod -var-file="preprod.tfvars" -var="ECR_Image=329794110703.dkr.ecr.eu-west-1.amazonaws.com/sorters:$CI_PIPELINE_ID"
+#    - terraform apply -input=false tfplan.preprod
+#    - aws c3 cp terraform.tfstate s3://sorters/preprod/ --recursive
+  environment:
+    name: preprod
+  tags:
+    - root
+  artifacts:
+    paths:
+      - tfplan.preprod
+  when: manual
+  only:
+    - master
+
